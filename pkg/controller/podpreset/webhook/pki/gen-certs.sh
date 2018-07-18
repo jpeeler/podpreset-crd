@@ -17,3 +17,5 @@ kubectl create secret tls $SERVICE-tls -n $NAMESPACE \
   --key=$SERVICE-key.pem
 
 base64 -w 0 ca.pem > ca.pem.base64
+echo "Updating deployment caBundle"
+sed -i -E "s/(caBundle: )(.*)/\1$(cat ca.pem.base64)/" ../deployment.yaml
