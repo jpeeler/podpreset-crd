@@ -17,23 +17,25 @@ package podpreset
 
 import (
 	"context"
-	"log"
-	"reflect"
+	"fmt"
 
+	"github.com/golang/glog"
 	settingsv1alpha1 "github.com/jpeeler/podpreset-crd/pkg/apis/settings/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+)
+
+const (
+	annotationPrefix = "podpreset.admission.kubernetes.io"
 )
 
 /**
@@ -67,16 +69,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// TODO(user): Modify this to be the types you create
-	// Uncomment watch a Deployment created by PodPreset - change this for objects you create
-	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &settingsv1alpha1.PodPreset{},
-	})
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -97,8 +89,8 @@ type ReconcilePodPreset struct {
 // +kubebuilder:rbac:groups=settings.svcat.k8s.io,resources=podpresets,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcilePodPreset) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	// Fetch the PodPreset instance
-	instance := &settingsv1alpha1.PodPreset{}
-	err := r.Get(context.TODO(), request.NamespacedName, instance)
+	pp := &settingsv1alpha1.PodPreset{}
+	err := r.Client.Get(context.TODO(), request.NamespacedName, pp)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
@@ -109,57 +101,27 @@ func (r *ReconcilePodPreset) Reconcile(request reconcile.Request) (reconcile.Res
 		return reconcile.Result{}, err
 	}
 
-	// TODO(user): Change this to be the object type created by your controller
-	// Define the desired Deployment object
-	deploy := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      instance.Name + "-deployment",
-			Namespace: instance.Namespace,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"deployment": instance.Name + "-deployment"},
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"deployment": instance.Name + "-deployment"}},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "nginx",
-							Image: "nginx",
-						},
-					},
-				},
-			},
-		},
-	}
-	if err := controllerutil.SetControllerReference(instance, deploy, r.scheme); err != nil {
-		return reconcile.Result{}, err
-	}
+	selector, _ := metav1.LabelSelectorAsSelector(&pp.Spec.Selector)
+	deploymentList := &appsv1.DeploymentList{}
+	r.Client.List(context.TODO(), &client.ListOptions{LabelSelector: selector}, deploymentList)
 
-	// TODO(user): Change this for the object type created by your controller
-	// Check if the Deployment already exists
-	found := &appsv1.Deployment{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: deploy.Name, Namespace: deploy.Namespace}, found)
-	if err != nil && errors.IsNotFound(err) {
-		log.Printf("Creating Deployment %s/%s\n", deploy.Namespace, deploy.Name)
-		err = r.Create(context.TODO(), deploy)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-	} else if err != nil {
-		return reconcile.Result{}, err
-	}
-
-	// TODO(user): Change this for the object type created by your controller
-	// Update the found object and write the result back if there are any changes
-	if !reflect.DeepEqual(deploy.Spec, found.Spec) {
-		found.Spec = deploy.Spec
-		log.Printf("Updating Deployment %s/%s\n", deploy.Namespace, deploy.Name)
-		err = r.Update(context.TODO(), found)
-		if err != nil {
-			return reconcile.Result{}, err
+	for i, deployment := range deploymentList.Items {
+		glog.V(6).Infof("(%v) Looking at deployment %v\n", i, deployment.Name)
+		if selector.Matches(labels.Set(deployment.Spec.Template.ObjectMeta.Labels)) {
+			bouncedKey := fmt.Sprintf("%s/bounced-%s", annotationPrefix, pp.GetName())
+			resourceVersion, found := deployment.Spec.Template.ObjectMeta.Annotations[bouncedKey]
+			if !found || found && resourceVersion < pp.GetResourceVersion() {
+				// bounce pod since this is the first mutation or a later mutation has occurred
+				glog.V(4).Infof("Detected deployment '%v' needs bouncing", deployment.Name)
+				//bc.podpresetrecorder.Eventf(pp, v1.EventTypeNormal, "DeploymentBounced", "Bounced %v-%v due to newly created or updated podpreset", deployment.Name, deployment.GetResourceVersion())
+				metav1.SetMetaDataAnnotation(&deployment.Spec.Template.ObjectMeta, bouncedKey, pp.GetResourceVersion())
+				err = r.Client.Update(context.TODO(), &deployment)
+				if err != nil {
+					return reconcile.Result{}, err
+				}
+			}
 		}
 	}
+
 	return reconcile.Result{}, nil
 }
