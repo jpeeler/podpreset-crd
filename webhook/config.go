@@ -19,41 +19,26 @@ package main
 import (
 	"crypto/tls"
 
-	crdversioned "github.com/jpeeler/podpreset-crd/pkg/client/clientset/versioned"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/golang/glog"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
-// Get a clientset with in-cluster config.
-func getClient() *kubernetes.Clientset {
-	config, err := rest.InClusterConfig()
+func getCrdClient() client.Client {
+	config, err := config.GetConfig()
 	if err != nil {
 		glog.Fatal(err)
 	}
-	clientset, err := kubernetes.NewForConfig(config)
+	crdclient, err := client.New(config, client.Options{Scheme: scheme})
 	if err != nil {
 		glog.Fatal(err)
 	}
 
-	return clientset
+	return crdclient
 }
 
-func getCrdClient() *crdversioned.Clientset {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		glog.Fatal(err)
-	}
-	clientset, err := crdversioned.NewForConfig(config)
-	if err != nil {
-		glog.Fatal(err)
-	}
-
-	return clientset
-}
-
-func configTLS(config Config, clientset *kubernetes.Clientset) *tls.Config {
+func configTLS(config Config) *tls.Config {
 	sCert, err := tls.LoadX509KeyPair(config.CertFile, config.KeyFile)
 	if err != nil {
 		glog.Fatalf("config=%#v Error: %v", config, err)

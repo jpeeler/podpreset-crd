@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -30,10 +31,11 @@ import (
 	"github.com/mattbaird/jsonpatch"
 	"k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -349,21 +351,29 @@ func mutatePods(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 	if podAnnotations := pod.GetAnnotations(); podAnnotations != nil {
 		glog.V(5).Infof("Looking at pod annotations, found: %v", podAnnotations)
 		if podAnnotations[fmt.Sprintf("%s/exclude", annotationPrefix)] == "true" {
-			return nil
+			return &reviewResponse
 		}
 		if _, isMirrorPod := podAnnotations[corev1.MirrorPodAnnotationKey]; isMirrorPod {
-			return nil
+			return &reviewResponse
 		}
 	}
 
 	crdclient := getCrdClient()
-	list, err := crdclient.SettingsV1alpha1().PodPresets(pod.Namespace).List(v1.ListOptions{})
-	if err != nil {
-		glog.Errorf("error fetching podpresets : %v", err)
+	list := &settingsapi.PodPresetList{}
+	err := crdclient.List(context.TODO(), &client.ListOptions{Namespace: pod.Namespace}, list)
+	if meta.IsNoMatchError(err) {
+		glog.Errorf("%v (has the CRD been loaded?)", err)
+		return toAdmissionResponse(err)
+	} else if err != nil {
+		glog.Errorf("error fetching podpresets: %v", err)
 		return toAdmissionResponse(err)
 	}
 
 	glog.Infof("fetched %d podpreset(s) in namespace %s", len(list.Items), pod.Namespace)
+	if len(list.Items) == 0 {
+		glog.V(5).Infof("No pod presets created, so skipping pod %v", pod.Name)
+		return &reviewResponse
+	}
 
 	matchingPPs, err := filterPodPresets(list.Items, &pod)
 	if err != nil {
@@ -373,7 +383,7 @@ func mutatePods(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 
 	if len(matchingPPs) == 0 {
 		glog.V(5).Infof("No matching pod presets, so skipping pod %v", pod.Name)
-		return nil
+		return &reviewResponse
 	}
 
 	presetNames := make([]string, len(matchingPPs))
@@ -479,10 +489,9 @@ func main() {
 	flag.Parse()
 
 	http.HandleFunc("/mutating-pods", serveMutatePods)
-	clientset := getClient()
 	server := &http.Server{
 		Addr:      ":443",
-		TLSConfig: configTLS(config, clientset),
+		TLSConfig: configTLS(config),
 	}
 	glog.Infof("About to start serving webhooks: %#v", server)
 	server.ListenAndServeTLS("", "")

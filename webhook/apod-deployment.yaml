@@ -4,6 +4,7 @@ metadata:
   name: apod-deployment
   labels:
     app: apod-deployment
+    mutateAll: "true"
 spec:
   replicas: 1
   selector:
@@ -26,3 +27,4 @@ spec:
         args:
         - sleep
         - "86400"
+      terminationGracePeriodSeconds: 1
