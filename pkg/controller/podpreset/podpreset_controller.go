@@ -22,10 +22,12 @@ import (
 	"github.com/golang/glog"
 	settingsv1alpha1 "github.com/jpeeler/podpreset-crd/pkg/apis/settings/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -52,7 +54,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcilePodPreset{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcilePodPreset{Client: mgr.GetClient(), scheme: mgr.GetScheme(), recorder: mgr.GetRecorder("podpreset-controller")}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -77,7 +79,8 @@ var _ reconcile.Reconciler = &ReconcilePodPreset{}
 // ReconcilePodPreset reconciles a PodPreset object
 type ReconcilePodPreset struct {
 	client.Client
-	scheme *runtime.Scheme
+	scheme   *runtime.Scheme
+	recorder record.EventRecorder
 }
 
 // Reconcile reads that state of the cluster for a PodPreset object and makes changes based on the state read
@@ -101,7 +104,10 @@ func (r *ReconcilePodPreset) Reconcile(request reconcile.Request) (reconcile.Res
 		return reconcile.Result{}, err
 	}
 
-	selector, _ := metav1.LabelSelectorAsSelector(&pp.Spec.Selector)
+	selector, err := metav1.LabelSelectorAsSelector(&pp.Spec.Selector)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
 	deploymentList := &appsv1.DeploymentList{}
 	r.Client.List(context.TODO(), &client.ListOptions{LabelSelector: selector}, deploymentList)
 
@@ -113,7 +119,9 @@ func (r *ReconcilePodPreset) Reconcile(request reconcile.Request) (reconcile.Res
 			if !found || found && resourceVersion < pp.GetResourceVersion() {
 				// bounce pod since this is the first mutation or a later mutation has occurred
 				glog.V(4).Infof("Detected deployment '%v' needs bouncing", deployment.Name)
-				//bc.podpresetrecorder.Eventf(pp, v1.EventTypeNormal, "DeploymentBounced", "Bounced %v-%v due to newly created or updated podpreset", deployment.Name, deployment.GetResourceVersion())
+				// TODO: may not need both of these events
+				r.recorder.Eventf(pp, v1.EventTypeNormal, "DeploymentBounced", "Bounced %v-%v due to newly created or updated podpreset", deployment.Name, deployment.GetResourceVersion())
+				r.recorder.Eventf(&deployment, v1.EventTypeNormal, "DeploymentBounced", "Bounced to newly created or updated podpreset %v-%v", pp.Name, pp.GetResourceVersion())
 				metav1.SetMetaDataAnnotation(&deployment.Spec.Template.ObjectMeta, bouncedKey, pp.GetResourceVersion())
 				err = r.Client.Update(context.TODO(), &deployment)
 				if err != nil {
