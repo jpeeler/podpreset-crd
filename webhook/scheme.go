@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"github.com/jpeeler/podpreset-crd/pkg/apis"
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,4 +34,5 @@ func init() {
 func addToScheme(scheme *runtime.Scheme) {
 	corev1.AddToScheme(scheme)
 	admissionregistrationv1beta1.AddToScheme(scheme)
+	apis.AddToScheme(scheme)
 }
