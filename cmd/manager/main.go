@@ -16,6 +16,7 @@ limitations under the License.
 package main
 
 import (
+	"flag"
 	"log"
 
 	"github.com/jpeeler/podpreset-crd/pkg/apis"
@@ -28,6 +29,7 @@ import (
 
 func main() {
 	// Get a config to talk to the apiserver
+	flag.Parse()
 	cfg, err := config.GetConfig()
 	if err != nil {
 		log.Fatal(err)
