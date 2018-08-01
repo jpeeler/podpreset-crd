@@ -50,3 +50,18 @@ docker-build: test
 # Push the docker image
 docker-push:
 	docker push ${IMG}
+
+#
+# Mutating webhook targets from here below
+#
+deploy-webhook:
+	kubectl apply -f webhook/rbac/
+	kustomize build webhook/kustomize-config | kubectl apply -f -
+
+undeploy-webhook:
+	kustomize build webhook/kustomize-config | kubectl delete -f -
+	kubectl delete -f webhook/rbac/
+docker-build-webhook:
+	CGO_ENABLED=0 GOOS=linux go build -o ./webhook/webhook ./webhook/
+	docker build --no-cache -t docker.io/service-catalog/admission-webhook ./webhook/
+	rm -rf ./webhook/webhook
