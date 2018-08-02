@@ -1,6 +1,6 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= podpreset-controller:latest
+IMG ?= docker.io/service-catalog/podpreset-controller:latest
 
 all: test manager
 
@@ -24,6 +24,10 @@ install: manifests
 deploy: manifests
 	kubectl apply -f config/crds
 	kustomize build config/default | kubectl apply -f -
+
+undeploy:
+	kustomize build config/default | kubectl delete -f -
+	kubectl delete -f config/crds
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests:

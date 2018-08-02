@@ -8,5 +8,6 @@ spec:
     spec:
       containers:
       # Change the value of image field below to your controller image URL (should match makefile)
-      - image: podpreset-controller:latest
+      - image: docker.io/service-catalog/podpreset-controller:latest
         name: manager
+        imagePullPolicy: IfNotPresent
