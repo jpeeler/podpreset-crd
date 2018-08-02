@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apod-deployment
+  labels:
+    app: apod-deployment
+    mutateAll: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: apod-deployment
+  template:
+    metadata:
+      annotations:
+        podpreset.admission.kubernetes.io/exclude: "true"
+      labels:
+        app: apod-deployment
+        mutateAll: "true"
+    spec:
+      containers:
+      - name: apod1
+        image: busybox
+        args:
+        - sleep
+        - "86400"
+      - name: apod2
+        image: busybox
+        args:
+        - sleep
+        - "86400"
+      terminationGracePeriodSeconds: 1
