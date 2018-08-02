@@ -1,3 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: podpreset-crd-system
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
