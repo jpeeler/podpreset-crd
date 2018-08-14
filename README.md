@@ -67,6 +67,6 @@ needs to be adjusted accordingly afterwards, unless the deployment file is used 
 ### Service Catalog integration
 
 This repository is only one piece required for full integration with Service
-Catalog. Also review the [podpresetbindings-crd](https://github.com/jpeeler/podpresetbindings-crd)
+Catalog. Also review the [podpresetbinding-crd](https://github.com/jpeeler/podpresetbinding-crd)
 repository for functionality that auto-generates pod presets upon service
 bindings being ready.
