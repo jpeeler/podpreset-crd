@@ -70,3 +70,8 @@ This repository is only one piece required for full integration with Service
 Catalog. Also review the [podpresetbinding-crd](https://github.com/jpeeler/podpresetbinding-crd)
 repository for functionality that auto-generates pod presets upon service
 bindings being ready.
+
+### WARNING
+
+Until the podpresetbinding-crd work is complete, this repo will likely undergo force pushes
+to add additional necessary changes.
