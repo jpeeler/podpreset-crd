@@ -4,7 +4,7 @@ metadata:
   name: webhook-role
 rules:
 - apiGroups:
-  - settings.servicecatalog.k8s.io
+  - settings.svcat.k8s.io
   resources:
   - podpresets
   verbs:

@@ -59,7 +59,7 @@ kind: MutatingWebhookConfiguration
 metadata:
   name: podpreset-webook-configuration
 webhooks:
-  - name: podpresets.settings.servicecatalog.k8s.io
+  - name: podpresets.settings.svcat.k8s.io
     rules:
       - apiGroups:
           - ""
