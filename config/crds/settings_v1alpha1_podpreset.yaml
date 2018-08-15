@@ -21,6 +21,27 @@ spec:
         metadata:
           type: object
         spec:
+          properties:
+            env:
+              items:
+                type: object
+              type: array
+            envFrom:
+              items:
+                type: object
+              type: array
+            selector:
+              type: object
+            volumeMounts:
+              items:
+                type: object
+              type: array
+            volumes:
+              items:
+                type: object
+              type: array
+          required:
+          - selector
           type: object
         status:
           type: object
