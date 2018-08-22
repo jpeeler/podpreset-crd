@@ -91,6 +91,7 @@ type ReconcilePodPreset struct {
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=settings.svcat.k8s.io,resources=podpresets,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcilePodPreset) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	glog.V(6).Infof("Entering reconcile: %#v\n", request)
 	// Fetch the PodPreset instance
 	pp := &settingsv1alpha1.PodPreset{}
 	err := r.Client.Get(context.TODO(), request.NamespacedName, pp)
@@ -103,13 +104,14 @@ func (r *ReconcilePodPreset) Reconcile(request reconcile.Request) (reconcile.Res
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
+	glog.V(6).Infof("Fetched podpreset object: %#v\n", pp)
 
 	selector, err := metav1.LabelSelectorAsSelector(&pp.Spec.Selector)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 	deploymentList := &appsv1.DeploymentList{}
-	r.Client.List(context.TODO(), &client.ListOptions{LabelSelector: selector}, deploymentList)
+	r.Client.List(context.TODO(), &client.ListOptions{}, deploymentList)
 
 	for i, deployment := range deploymentList.Items {
 		glog.V(6).Infof("(%v) Looking at deployment %v\n", i, deployment.Name)

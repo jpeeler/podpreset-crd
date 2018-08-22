@@ -1,21 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: apod-deployment
+  name: apod-deployment-exclude
   labels:
-    app: apod-deployment
-    mutateAll: "true"
+    app: apod-deployment-exclude
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: apod-deployment
+      app: apod-deployment-exclude
   template:
     metadata:
       annotations:
         podpreset.admission.kubernetes.io/exclude: "true"
       labels:
-        app: apod-deployment
+        app: apod-deployment-exclude
         mutateAll: "true"
     spec:
       containers:
