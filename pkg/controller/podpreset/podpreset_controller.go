@@ -111,7 +111,10 @@ func (r *ReconcilePodPreset) Reconcile(request reconcile.Request) (reconcile.Res
 		return reconcile.Result{}, err
 	}
 	deploymentList := &appsv1.DeploymentList{}
-	r.Client.List(context.TODO(), &client.ListOptions{}, deploymentList)
+	err = r.Client.List(context.TODO(), &client.ListOptions{}, deploymentList)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
 
 	for i, deployment := range deploymentList.Items {
 		glog.V(6).Infof("(%v) Looking at deployment %v\n", i, deployment.Name)
